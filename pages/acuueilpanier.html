@@ -1,0 +1,135 @@
+
+    <header class="main-header">
+        <NuxtLink to="/" class="app-logo">Mon Super E-commerce</NuxtLink>
+        
+        <nav class="main-nav">
+          <NuxtLink to="/produits" class="nav-link">Produits</NuxtLink>
+          <!-- Ajoutez d'autres liens de navigation si nécessaire -->
+        </nav>
+  
+        <div class="cart-icon-container">
+          <!-- Bouton pour ouvrir la page panier -->
+          <!-- @click="goToCartPage" déclenchera la navigation -->
+          <button @click="goToCartPage" class="global-cart-button">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
+            </svg>
+            <span v-if="cartStore.totalItems > 0" class="cart-item-count">
+              {{ cartStore.totalItems }}
+            </span>
+          </button>
+        </div>
+      </header>
+  
+      <!-- La balise NuxtPage affiche le contenu de la page actuelle (ex: panier.vue) -->
+      <main>
+        <NuxtPage /> 
+      </main>
+  
+      <!-- Pied de page global (optionnel) -->
+      <footer class="main-footer">
+        <p>&copy; 2023 Mon Super E-commerce. Tous droits réservés.</p>
+      </footer>
+    </div>
+  </template>
+  
+  <script setup lang="ts">
+  import { useCartStore } from '@/stores/cart'; // Importez votre store Pinia
+  import { navigateTo } from '#app'; // Importez la fonction de navigation de Nuxt
+  
+  // Initialisez votre store Pinia
+  const cartStore = useCartStore();
+  
+  // Fonction pour naviguer vers la page du panier
+  const goToCartPage = () => {
+    navigateTo('/panier'); // Ceci redirigera l'utilisateur vers votre page panier
+  };
+  </script>
+  
+  <style scoped>
+  .main-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    background-color: #f8f8f8;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  .app-logo {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #2c3e50;
+    text-decoration: none;
+  }
+  
+  .main-nav .nav-link {
+    margin-left: 1.5rem;
+    color: #34495e;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+  
+  .main-nav .nav-link:hover {
+    color: #2c3e50;
+  }
+  
+  .cart-icon-container {
+    /* Pour positionner l'icône du panier */
+  }
+  
+  .global-cart-button {
+    background-color: #3498db; /* Un bleu pour le panier */
+    color: white;
+    padding: 0.75rem 1rem;
+    border-radius: 9999px; /* Pour un bouton rond ou pilule */
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    border: none;
+    font-weight: 600;
+    transition: background-color 0.2s ease-in-out;
+    position: relative; /* Nécessaire pour positionner le compteur */
+  }
+  
+  .global-cart-button:hover {
+    background-color: #2980b9;
+  }
+  
+  .global-cart-button svg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+  
+  .cart-item-count {
+    position: absolute;
+    top: -8px; /* Ajustez selon l'esthétique */
+    right: -8px; /* Ajustez selon l'esthétique */
+    background-color: #e74c3c; /* Rouge pour le compteur */
+    color: white;
+    font-size: 0.75rem;
+    font-weight: bold;
+    border-radius: 50%;
+    padding: 0.25rem 0.5rem;
+    line-height: 1; /* Pour un bon alignement du texte */
+    min-width: 20px; /* Assure une taille minimale */
+    text-align: center;
+    display: flex; /* Centrer le texte */
+    justify-content: center; /* Centrer le texte */
+    align-items: center; /* Centrer le texte */
+  }
+  
+  main {
+    padding: 20px; /* Ajoute un peu d'espace autour du contenu de la page */
+  }
+  
+  .main-footer {
+    text-align: center;
+    padding: 1.5rem;
+    background-color: #f0f0f0;
+    color: #555;
+    margin-top: 50px;
+  }
+  </style> 
