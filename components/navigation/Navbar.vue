@@ -1,14 +1,33 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Flame, Zap, Star, Percent, Clock, Monitor, ChefHat, Wind, Grid3X3, ShoppingCart, Search, Folder, FileText, UserIcon, Package, Heart, LogOut, Menu, BadgePercent, ShoppingBag } from 'lucide-vue-next'
+import { 
+  Flame, Zap, Star, Percent, Clock, Monitor, ChefHat, Wind, Grid3X3, 
+  ShoppingCart, Search, Folder, FileText, UserIcon, Package, Heart, 
+  LogOut, Menu, BadgePercent, ShoppingBag, LogIn, UserPlus 
+} from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ChevronRight, ChevronDown } from 'lucide-vue-next'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
 
 const router = useRouter()
 const searchQuery = ref('')
@@ -17,44 +36,26 @@ const showResults = ref(false)
 const isLoading = ref(false)
 const cartCount = ref(0)
 
+// Authentification
+const isAuthenticated = ref(false)
+const authDialogOpen = ref(false)
+const authMode = ref<'login' | 'register'>('login')
+const email = ref('')
+const password = ref('')
+const confirmPassword = ref('')
 
 import { useCartStore } from '@/stores/cart'; 
 import { navigateTo } from '#app'; 
 
-const forceReloadCart = () => {
-  navigateTo('/panier');
-}
-
-console.log('Routes:', router.getRoutes()) 
-
-
-// Déclare cartStore comme un ref qui peut être null au début.
-// Cela gère le cas où le store n'est pas encore initialisé, notamment lors du SSR.
 const cartStore = ref<ReturnType<typeof useCartStore> | null>(null);
 
-// Initialise le store Pinia uniquement lorsque le composant est monté sur le client.
-// Cela évite les erreurs "Cannot read properties of undefined" liées au SSR.
 onMounted(() => {
   cartStore.value = useCartStore();
-  // Optionnel: Logs de débogage pour voir l'état du store
   console.log('Navbar: cartStore initialisé sur mounted:', cartStore.value);
   if (cartStore.value) {
     console.log('Navbar: totalItems sur mounted:', cartStore.value.totalItems);
   }
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const navigateTo = (path: string) => {
   router.push(path)
@@ -113,7 +114,38 @@ const closeResults = () => {
   }, 200)
 }
 
+// Fonctions d'authentification
+const toggleAuth = (mode: 'login' | 'register') => {
+  authMode.value = mode
+  authDialogOpen.value = true
+}
 
+const handleLogin = () => {
+  // Ici vous devriez implémenter la logique réelle de connexion
+  console.log('Tentative de connexion avec:', email.value)
+  isAuthenticated.value = true
+  authDialogOpen.value = false
+  email.value = ''
+  password.value = ''
+}
+
+const handleRegister = () => {
+  // Ici vous devriez implémenter la logique réelle d'inscription
+  if (password.value !== confirmPassword.value) {
+    alert('Les mots de passe ne correspondent pas')
+    return
+  }
+  console.log('Tentative d\'inscription avec:', email.value)
+  isAuthenticated.value = true
+  authDialogOpen.value = false
+  email.value = ''
+  password.value = ''
+  confirmPassword.value = ''
+}
+
+const handleLogout = () => {
+  isAuthenticated.value = false
+}
 </script>
 
 <template>
@@ -326,15 +358,27 @@ const closeResults = () => {
                   </SheetHeader>
                   
                   <div class="flex-1 overflow-y-auto">
-                    <!-- User section -->
-                    <div class="p-4 border-b bg-muted/20">
+                    <!-- Section authentification mobile -->
+                    <div v-if="!isAuthenticated" class="p-4 border-b bg-muted/20 flex flex-col space-y-2">
+                      <Button @click="toggleAuth('login')" class="w-full">
+                        <LogIn class="w-4 h-4 mr-2" :stroke-width="2.5" />
+                        Se connecter
+                      </Button>
+                      <Button @click="toggleAuth('register')" variant="outline" class="w-full">
+                        <UserPlus class="w-4 h-4 mr-2" :stroke-width="2.5" />
+                        S'inscrire
+                      </Button>
+                    </div>
+
+                    <!-- Section utilisateur mobile quand connecté -->
+                    <div v-else class="p-4 border-b bg-muted/20">
                       <div class="flex items-center space-x-1">
                         <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
                           <UserIcon class="w-5 h-5 text-primary" :stroke-width="2.5" />
                         </div>
                         <div>
-                          <p class="font-medium">yannick</p>
-                          <p class="text-sm text-muted-foreground">iamyannick@gmail.com</p>
+                          <p class="font-medium">Mon compte</p>
+                          <p class="text-sm text-muted-foreground">Connecté</p>
                         </div>
                       </div>
                     </div>
@@ -403,69 +447,105 @@ const closeResults = () => {
                         </div>
                       </div>
                     </div>
+
+                    <!-- Menu utilisateur mobile -->
+                    <div v-if="isAuthenticated" class="p-4 space-y-1">
+                      <Button variant="ghost" class="w-full justify-start" @click="navigateTo('/profil')">
+                        <UserIcon class="w-4 h-4 mr-2" :stroke-width="2.5" />
+                        Mon profil
+                      </Button>
+                      <Button variant="ghost" class="w-full justify-start" @click="navigateTo('/commandes')">
+                        <Package class="w-4 h-4 mr-2" :stroke-width="2.5" />
+                        Mes commandes
+                      </Button>
+                      <Button variant="ghost" class="w-full justify-start" @click="navigateTo('/favoris')">
+                        <Heart class="w-4 h-4 mr-2" :stroke-width="2.5" />
+                        Mes favoris
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        class="w-full justify-start text-destructive" 
+                        @click="handleLogout"
+                      >
+                        <LogOut class="w-4 h-4 mr-2" :stroke-width="2.5" />
+                        Se déconnecter
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </SheetContent>
             </Sheet>
 
-            <!-- User account -->
-            <DropdownMenu>
-              <DropdownMenuTrigger as-child>
-                <Button variant="outline" size="sm" class="hidden sm:flex items-center space-x-2">
-                  <div class="w-8 h-8 flex items-center justify-center">
-                    <UserIcon class="w-4 h-4 text-primary" :stroke-width="2.5" />
-                  </div>
-                  <div class="text-left hidden lg:block">
-                    <div class="text-sm font-medium">yannick</div>
-                  </div>
-                  <ChevronDown class="w-4 h-4 hidden lg:block" :stroke-width="2.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" class="w-56">
-                <div class="px-3 py-2 border-b">
-                  <p class="font-medium">yannick</p>
-                  <p class="text-sm text-muted-foreground">iamyannick@gmail.com</p>
-                  <p class="text-sm text-muted-foreground">
-                    +237 655 37 77 30
-                  </p>
-                </div>
-                <DropdownMenuItem @click="navigateTo('/profil')">
-                  <UserIcon class="w-4 h-4 mr-2" :stroke-width="2.5" />
-                  Mon profil
-                </DropdownMenuItem>
-                <DropdownMenuItem @click="navigateTo('/commandes')">
-                  <Package class="w-4 h-4 mr-2" :stroke-width="2.5" />
-                  Mes commandes
-                </DropdownMenuItem>
-                <DropdownMenuItem @click="navigateTo('/favoris')">
-                  <Heart class="w-4 h-4 mr-2" :stroke-width="2.5" />
-                  Mes favoris
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem class="text-destructive">
-                  <LogOut class="w-4 h-4 mr-2" :stroke-width="2.5" />
-                  Se déconnecter
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <!-- Bouton panier -->
+            <NuxtLink 
+              to="/panier" 
+              class="global-cart-button"
+              aria-label="panier"
+            >
+              <ShoppingCart class="h-6 w-6" :stroke-width="2.5" />
+              <span v-if="cartStore?.totalItems > 0" class="cart-item-count">
+                {{ cartStore.totalItems }}
+              </span>
+            </NuxtLink>
 
-    
-  
-<NuxtLink 
-  to="/panier" 
-  class="global-cart-button"
-  aria-label="panier"
->
-  <ShoppingCart class="h-6 w-6" :stroke-width="2.5" />
-  <span v-if="cartStore?.totalItems > 0" class="cart-item-count">
-    {{ cartStore.totalItems }}
-  </span>
-</NuxtLink>
+            <!-- Section authentification desktop -->
+            <template v-if="!isAuthenticated">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                class="hidden sm:flex items-center space-x-2"
+                @click="toggleAuth('login')"
+              >
+                <LogIn class="w-4 h-4" :stroke-width="2.5" />
+                <span class="hidden lg:inline">Se connecter</span>
+              </Button>
 
+              <Button 
+                variant="default" 
+                size="sm" 
+                class="hidden sm:flex items-center space-x-2"
+                @click="toggleAuth('register')"
+              >
+                <UserPlus class="w-4 h-4" :stroke-width="2.5" />
+                <span class="hidden lg:inline">S'inscrire</span>
+              </Button>
+            </template>
 
-
-
- 
+            <!-- Menu utilisateur quand connecté -->
+            <template v-else>
+              <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                  <Button variant="outline" size="sm" class="hidden sm:flex items-center space-x-2">
+                    <div class="w-8 h-8 flex items-center justify-center">
+                      <UserIcon class="w-4 h-4 text-primary" :stroke-width="2.5" />
+                    </div>
+                    <div class="text-left hidden lg:block">
+                      <div class="text-sm font-medium">Mon compte</div>
+                    </div>
+                    <ChevronDown class="w-4 h-4 hidden lg:block" :stroke-width="2.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" class="w-56">
+                  <DropdownMenuItem @click="navigateTo('/profil')">
+                    <UserIcon class="w-4 h-4 mr-2" :stroke-width="2.5" />
+                    Mon profil
+                  </DropdownMenuItem>
+                  <DropdownMenuItem @click="navigateTo('/commandes')">
+                    <Package class="w-4 h-4 mr-2" :stroke-width="2.5" />
+                    Mes commandes
+                  </DropdownMenuItem>
+                  <DropdownMenuItem @click="navigateTo('/favoris')">
+                    <Heart class="w-4 h-4 mr-2" :stroke-width="2.5" />
+                    Mes favoris
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem class="text-destructive" @click="handleLogout">
+                    <LogOut class="w-4 h-4 mr-2" :stroke-width="2.5" />
+                    Se déconnecter
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </template>
           </div>
         </div>
 
@@ -505,6 +585,54 @@ const closeResults = () => {
         </div>
       </div>
     </div>
+
+    <!-- Dialogue d'authentification -->
+    <Dialog v-model:open="authDialogOpen">
+      <DialogContent class="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>{{ authMode === 'login' ? 'Connexion' : 'Inscription' }}</DialogTitle>
+          <DialogDescription>
+            {{ authMode === 'login' 
+              ? 'Connectez-vous pour accéder à votre compte' 
+              : 'Créez un compte pour bénéficier de nos services' }}
+          </DialogDescription>
+        </DialogHeader>
+        <div class="grid gap-4 py-4">
+          <div class="grid grid-cols-4 items-center gap-4">
+            <Label for="email" class="text-right">
+              Email
+            </Label>
+            <Input id="email" v-model="email" type="email" class="col-span-3" />
+          </div>
+          <div class="grid grid-cols-4 items-center gap-4">
+            <Label for="password" class="text-right">
+              Mot de passe
+            </Label>
+            <Input id="password" v-model="password" type="password" class="col-span-3" />
+          </div>
+          <div v-if="authMode === 'register'" class="grid grid-cols-4 items-center gap-4">
+            <Label for="confirm-password" class="text-right">
+              Confirmer
+            </Label>
+            <Input id="confirm-password" v-model="confirmPassword" type="password" class="col-span-3" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button 
+            variant="outline" 
+            @click="authMode = authMode === 'login' ? 'register' : 'login'"
+          >
+            {{ authMode === 'login' ? 'Créer un compte' : 'Déjà un compte ?' }}
+          </Button>
+          <Button 
+            type="submit" 
+            @click="authMode === 'login' ? handleLogin() : handleRegister()"
+          >
+            {{ authMode === 'login' ? 'Se connecter' : 'S\'inscrire' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
