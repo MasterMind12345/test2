@@ -1,24 +1,28 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { navigateTo as nuxtNavigateTo } from '#app'; // Renommer pour éviter le conflit
+
+// Importations des icônes de Lucide Vue Next
 import { 
   Flame, Zap, Star, Percent, Clock, Monitor, ChefHat, Wind, Grid3X3, 
   ShoppingCart, Search, Folder, FileText, UserIcon, Package, Heart, 
-  LogOut, Menu, BadgePercent, ShoppingBag, LogIn, UserPlus 
-} from 'lucide-vue-next'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { ChevronRight, ChevronDown } from 'lucide-vue-next'
+  LogOut, Menu, BadgePercent, ShoppingBag, LogIn, UserPlus, ChevronRight, ChevronDown 
+} from 'lucide-vue-next';
+
+// Importations des composants UI (Shadcn Vue)
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu'
+} from '@/components/ui/dropdown-menu';
 import {
   Dialog,
   DialogContent,
@@ -26,64 +30,185 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 
-const router = useRouter()
-const searchQuery = ref('')
-const searchResults = ref<any[]>([])
-const showResults = ref(false)
-const isLoading = ref(false)
-const cartCount = ref(0)
-
-// Authentification
-const isAuthenticated = ref(false)
-const authDialogOpen = ref(false)
-const authMode = ref<'login' | 'register'>('login')
-const email = ref('')
-const password = ref('')
-const confirmPassword = ref('')
-
+// Import du store de panier (Pinia)
 import { useCartStore } from '@/stores/cart'; 
-import { navigateTo } from '#app'; 
 
+const router = useRouter();
+
+// --- Variables d'état pour la recherche ---
+const searchQuery = ref('');
+const searchResults = ref<any[]>([]);
+const showResults = ref(false);
+const isLoading = ref(false);
+
+// --- Variables d'état pour le panier ---
 const cartStore = ref<ReturnType<typeof useCartStore> | null>(null);
 
-onMounted(() => {
-  cartStore.value = useCartStore();
-  console.log('Navbar: cartStore initialisé sur mounted:', cartStore.value);
-  if (cartStore.value) {
-    console.log('Navbar: totalItems sur mounted:', cartStore.value.totalItems);
+// --- Variables d'état pour l'authentification ---
+const isAuthenticated = ref(false); // Gère l'état de connexion de l'utilisateur
+const authDialogOpen = ref(false); // Gère l'ouverture/fermeture de la modale d'authentification
+const authMode = ref<'login' | 'register'>('login'); // 'login' ou 'register'
+const email = ref('');
+const password = ref('');
+const confirmPassword = ref('');
+const errorMessage = ref(''); // Pour afficher les messages d'erreur d'authentification
+
+// NOUVELLE VARIABLE pour les informations utilisateur
+const currentUser = ref<any | null>(null);
+
+// URL de base de votre instance Strapi Cloud
+const STRAPI_URL = 'https://kind-duck-a00ba31603.strapiapp.com/api'; 
+
+// --- Fonctions d'authentification ---
+
+// Fonction pour gérer la connexion
+const handleLogin = async () => {
+  errorMessage.value = ''; // Réinitialiser le message d'erreur
+
+  try {
+    const response = await fetch(`${STRAPI_URL}/auth/local`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        identifier: email.value, // Strapi utilise 'identifier' pour l'email ou le nom d'utilisateur
+        password: password.value,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+      errorMessage.value = data.error.message;
+      return;
+    }
+
+    // Connexion réussie : stocker le jeton JWT et les infos utilisateur
+    localStorage.setItem('jwt', data.jwt);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    isAuthenticated.value = true; // Mettre à jour l'état de connexion
+    currentUser.value = data.user; // Mettre à jour currentUser ICI
+    
+    // Fermer le dialogue et réinitialiser le formulaire
+    authDialogOpen.value = false;
+    resetForm();
+    
+    console.log('Connexion réussie:', data.user);
+
+  } catch (error) {
+    console.error('Erreur lors de la connexion:', error);
+    errorMessage.value = 'Erreur réseau ou serveur. Veuillez réessayer.';
   }
-});
+};
+
+// Fonction pour gérer l'inscription
+const handleRegister = async () => {
+  errorMessage.value = ''; // Réinitialiser le message d'erreur
+
+  // Vérifier la correspondance des mots de passe côté client
+  if (password.value !== confirmPassword.value) {
+    errorMessage.value = 'Les mots de passe ne correspondent pas.';
+    return;
+  }
+
+  try {
+    const response = await fetch(`${STRAPI_URL}/auth/local/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username: email.value.split('@')[0], // Génère un username simple à partir de l'email
+        email: email.value,
+        password: password.value,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+      errorMessage.value = data.error.message;
+      return;
+    }
+
+    // Inscription réussie : auto-login et stocker le jeton JWT et les infos utilisateur
+    localStorage.setItem('jwt', data.jwt);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    isAuthenticated.value = true; // Mettre à jour l'état de connexion
+    currentUser.value = data.user; // Mettre à jour currentUser ICI
+    
+    authDialogOpen.value = false;
+    resetForm();
+    
+    console.log('Inscription réussie:', data.user);
+
+  } catch (error) {
+    console.error('Erreur lors de l\'inscription:', error);
+    errorMessage.value = 'Erreur réseau ou serveur. Veuillez réessayer.';
+  }
+};
+
+// Fonction pour gérer la déconnexion
+const handleLogout = () => {
+  localStorage.removeItem('jwt'); // Supprimer le jeton
+  localStorage.removeItem('user'); // Supprimer les infos utilisateur
+  isAuthenticated.value = false; // Mettre à jour l'état de connexion
+  currentUser.value = null; // Réinitialiser currentUser ICI
+  console.log('Déconnexion réussie.');
+  // Optionnel : rediriger l'utilisateur vers la page d'accueil ou de connexion
+  router.push('/');
+};
+
+// Réinitialiser les champs du formulaire d'authentification et les messages d'erreur
+const resetForm = () => {
+  email.value = '';
+  password.value = '';
+  confirmPassword.value = '';
+  errorMessage.value = '';
+};
+
+// Basculer entre les modes de connexion/inscription et ouvrir le dialogue
+const toggleAuth = (mode: 'login' | 'register') => {
+  console.log(`toggleAuth: Fonction appelée avec le mode ${mode}`);
+  authMode.value = mode;
+  resetForm(); // S'assurer que le formulaire est propre lors de l'ouverture
+  authDialogOpen.value = true;
+  console.log(`toggleAuth: authDialogOpen réglé à ${authDialogOpen.value}`);
+};
+
+// --- Fonctions utilitaires et autres logiques ---
 
 const navigateTo = (path: string) => {
-  router.push(path)
-}
+  router.push(path);
+};
 
 const getStrapiImageUrl = (url: string) => {
-  if (!url) return ''
-  return url.startsWith('http') ? url : `https://kind-duck-a00ba31603.strapiapp.com${url}`
-}
+  if (!url) return '';
+  return url.startsWith('http') ? url : `https://kind-duck-a00ba31603.strapiapp.com${url}`;
+};
 
 const performSearch = async () => {
   if (!searchQuery.value.trim()) {
-    searchResults.value = []
-    showResults.value = false
-    return
+    searchResults.value = [];
+    showResults.value = false;
+    return;
   }
 
-  isLoading.value = true
-  showResults.value = true
+  isLoading.value = true;
+  showResults.value = true; 
   
   try {
     const response = await fetch(
-      `https://kind-duck-a00ba31603.strapiapp.com/api/produits?filters[Nom][$contains]=${encodeURIComponent(searchQuery.value)}&populate=image`
-    )
+      `${STRAPI_URL}/produits?filters[Nom][$contains]=${encodeURIComponent(searchQuery.value)}&populate=image`
+    );
     
-    if (!response.ok) throw new Error('Erreur lors de la recherche')
+    if (!response.ok) throw new Error('Erreur lors de la recherche');
     
-    const data = await response.json()
+    const data = await response.json();
     
     searchResults.value = data.data.map((item: any) => ({
       id: item.id,
@@ -91,71 +216,138 @@ const performSearch = async () => {
       prix: item.prix ? Number(item.prix).toLocaleString() + ' FCFA' : 'N/A',
       image: item.image || [],
       categorie: item.categorie?.Nom || 'Non catégorisé'
-    }))
+    }));
     
   } catch (error) {
-    console.error('Erreur de recherche:', error)
-    searchResults.value = []
+    console.error('Erreur de recherche:', error);
+    searchResults.value = [];
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 
 const navigateToProduct = (product: any) => {
-  router.push(`/produits/${product.id}`)
-  searchQuery.value = ''
-  searchResults.value = []
-  showResults.value = false
-}
+  router.push(`/produits/${product.id}`);
+  searchQuery.value = '';
+  searchResults.value = [];
+  showResults.value = false;
+};
 
 const closeResults = () => {
+  // Utilisez un petit délai pour permettre les clics sur les résultats avant de cacher
   setTimeout(() => {
-    showResults.value = false
-  }, 200)
-}
+    showResults.value = false;
+  }, 200);
+};
 
-// Fonctions d'authentification
-const toggleAuth = (mode: 'login' | 'register') => {
-  authMode.value = mode
-  authDialogOpen.value = true
-}
-
-const handleLogin = () => {
-  // Ici vous devriez implémenter la logique réelle de connexion
-  console.log('Tentative de connexion avec:', email.value)
-  isAuthenticated.value = true
-  authDialogOpen.value = false
-  email.value = ''
-  password.value = ''
-}
-
-const handleRegister = () => {
-  // Ici vous devriez implémenter la logique réelle d'inscription
-  if (password.value !== confirmPassword.value) {
-    alert('Les mots de passe ne correspondent pas')
-    return
+// --- Données factices pour les catégories (à remplacer par des données réelles de Strapi si nécessaire) ---
+const categoriesTree = ref([
+  {
+    id: 1,
+    name: 'Électronique',
+    icon: Monitor,
+    count: 120,
+    isOpen: false, // pour desktop
+    isOpenMobile: false, // pour mobile
+    subcategories: [
+      {
+        id: 101,
+        name: 'Smartphones',
+        isOpenMobile: false,
+        items: ['iPhone', 'Android', 'Accessoires']
+      },
+      {
+        id: 102,
+        name: 'Ordinateurs',
+        isOpenMobile: false,
+        items: ['Ordinateurs Portables', 'Ordinateurs de Bureau', 'Périphériques']
+      }
+    ]
+  },
+  {
+    id: 2,
+    name: 'Mode & Habillement',
+    icon: Wind,
+    count: 300,
+    isOpen: false,
+    isOpenMobile: false,
+    subcategories: [
+      {
+        id: 201,
+        name: 'Vêtements Homme',
+        isOpenMobile: false,
+        items: ['T-shirts', 'Pantalons', 'Vestes']
+      },
+      {
+        id: 202,
+        name: 'Vêtements Femme',
+        isOpenMobile: false,
+        items: ['Robes', 'Jupes', 'Chemisiers']
+      }
+    ]
+  },
+  {
+    id: 3,
+    name: 'Alimentation',
+    icon: ChefHat,
+    count: 80,
+    isOpen: false,
+    isOpenMobile: false,
+    subcategories: [
+      {
+        id: 301,
+        name: 'Produits Frais',
+        isOpenMobile: false,
+        items: ['Fruits', 'Légumes', 'Viandes']
+      },
+      {
+        id: 302,
+        name: 'Épicerie',
+        isOpenMobile: false,
+        items: ['Pâtes', 'Huiles', 'Conserves']
+      }
+    ]
   }
-  console.log('Tentative d\'inscription avec:', email.value)
-  isAuthenticated.value = true
-  authDialogOpen.value = false
-  email.value = ''
-  password.value = ''
-  confirmPassword.value = ''
-}
+]);
 
-const handleLogout = () => {
-  isAuthenticated.value = false
-}
+// --- Données factices pour les promotions ---
+const promotions = ref([
+  { id: 1, title: 'Flash Sales', icon: Flame, discount: '-20%', link: '/promotions/flash-sales' },
+  { id: 2, title: 'Offres Éclair', icon: Zap, discount: '-15%', link: '/promotions/offres-eclair' },
+  { id: 3, title: 'Nouveautés', icon: Star, discount: 'New', link: '/nouveautes' },
+  { id: 4, title: 'Top Ventes', icon: Percent, discount: 'Populaire', link: '/top-ventes' },
+  { id: 5, title: 'Dernière Chance', icon: Clock, discount: '-10%', link: '/derniere-chance' },
+]);
+
+
+// --- Lifecycle Hook ---
+onMounted(() => {
+  // Initialisation du cartStore
+  cartStore.value = useCartStore();
+  console.log('Navbar: cartStore initialisé sur mounted:', cartStore.value);
+  if (cartStore.value) {
+    console.log('Navbar: totalItems sur mounted:', cartStore.value.totalItems);
+  }
+
+  // Vérifier si l'utilisateur est déjà connecté au chargement de la page
+  const jwt = localStorage.getItem('jwt');
+  if (jwt) {
+    isAuthenticated.value = true;
+    // Récupérer les informations utilisateur stockées
+    const user = localStorage.getItem('user');
+    if (user) {
+      currentUser.value = JSON.parse(user); // INITIALISER currentUser AU CHARGEMENT
+    }
+  }
+});
 </script>
 
 <template>
   <div class="w-full">
-    <!-- Top banner -->
     <div class="bg-gradient-to-r from-primary/95 to-secondary/95 text-white text-center py-2 text-sm font-medium">
       Espace promotionnel
     </div>
     
-    <!-- Phone number bar -->
     <div class="bg-background border-b py-2 px-4">
       <div class="container mx-auto flex justify-end items-center text-sm">
         <span class="mr-4 text-muted-foreground">Commandez par appel au</span>
@@ -163,12 +355,10 @@ const handleLogout = () => {
       </div>
     </div>
 
-    <!-- Main navigation -->
     <nav class="bg-background/95 border-b shadow-sm sticky top-0 z-40 backdrop-blur-sm">
       <div class="container mx-auto px-4">
         <div class="flex items-center justify-between py-4">
-          <!-- Logo -->
-          <NuxtLink to="" class="flex items-center space-x-3 hover:opacity-80 transition-opacity">
+          <NuxtLink to="/" class="flex items-center space-x-3 hover:opacity-80 transition-opacity">
             <div class="bg-primary p-2 rounded-lg shadow-sm">
               <ShoppingBag class="w-6 h-6 text-primary-foreground" :stroke-width="2.5" />
             </div>
@@ -178,7 +368,6 @@ const handleLogout = () => {
             </div>
           </NuxtLink>
 
-          <!-- Search bar (version desktop) -->
           <div class="hidden md:flex flex-1 max-w-2xl mx-8 relative">
             <form @submit.prevent="performSearch" class="relative w-full flex">
               <Input
@@ -199,7 +388,6 @@ const handleLogout = () => {
               </Button>
             </form>
 
-            <!-- Résultats de recherche -->
             <div 
               v-if="showResults && (searchResults.length > 0 || isLoading)"
               class="absolute top-full left-0 right-0 z-50 mt-1 bg-background border rounded-lg shadow-lg max-h-96 overflow-y-auto"
@@ -237,9 +425,7 @@ const handleLogout = () => {
             </div>
           </div>
 
-          <!-- Right side actions -->
           <div class="flex items-center space-x-2">
-            <!-- Categories menu button -->
             <Sheet>
               <SheetTrigger as-child>
                 <Button variant="outline" size="sm" class="hidden sm:flex items-center space-x-1">
@@ -331,7 +517,6 @@ const handleLogout = () => {
               </SheetContent>
             </Sheet>
 
-            <!-- Mobile hamburger menu -->
             <Sheet>
               <SheetTrigger as-child>
                 <Button
@@ -358,7 +543,6 @@ const handleLogout = () => {
                   </SheetHeader>
                   
                   <div class="flex-1 overflow-y-auto">
-                    <!-- Section authentification mobile -->
                     <div v-if="!isAuthenticated" class="p-4 border-b bg-muted/20 flex flex-col space-y-2">
                       <Button @click="toggleAuth('login')" class="w-full">
                         <LogIn class="w-4 h-4 mr-2" :stroke-width="2.5" />
@@ -370,26 +554,26 @@ const handleLogout = () => {
                       </Button>
                     </div>
 
-                    <!-- Section utilisateur mobile quand connecté -->
                     <div v-else class="p-4 border-b bg-muted/20">
-                      <div class="flex items-center space-x-1">
-                        <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                          <UserIcon class="w-5 h-5 text-primary" :stroke-width="2.5" />
+                      <Button variant="ghost" class="w-full justify-start h-auto py-2" @click="navigateTo('/profil')">
+                        <div class="flex items-center space-x-3">
+                          <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                            <UserIcon class="w-4 h-4 text-primary" :stroke-width="2.5" />
+                          </div>
+                          <div class="flex flex-col items-start">
+                            <span class="font-medium">Mon profil</span>
+                            <span class="text-xs text-muted-foreground">{{ currentUser?.username || 'Utilisateur' }}</span>
+                            <span class="text-xs text-muted-foreground">{{ currentUser?.email || 'email@exemple.com' }}</span>
+                          </div>
                         </div>
-                        <div>
-                          <p class="font-medium">Mon compte</p>
-                          <p class="text-sm text-muted-foreground">Connecté</p>
-                        </div>
-                      </div>
+                      </Button>
                     </div>
 
-                    <!-- Categories for mobile -->
                     <div class="p-4">
                       <h3 class="font-semibold mb-4 flex items-center">
                         <Grid3X3 class="w-5 h-5 mr-2 text-primary" :stroke-width="2.5" />
                         Catégories
                       </h3>
-                      <!-- Tree structure for mobile -->
                       <div class="space-y-1">
                         <div v-for="category in categoriesTree" :key="category.id">
                           <Collapsible v-model:open="category.isOpenMobile">
@@ -448,12 +632,7 @@ const handleLogout = () => {
                       </div>
                     </div>
 
-                    <!-- Menu utilisateur mobile -->
                     <div v-if="isAuthenticated" class="p-4 space-y-1">
-                      <Button variant="ghost" class="w-full justify-start" @click="navigateTo('/profil')">
-                        <UserIcon class="w-4 h-4 mr-2" :stroke-width="2.5" />
-                        Mon profil
-                      </Button>
                       <Button variant="ghost" class="w-full justify-start" @click="navigateTo('/commandes')">
                         <Package class="w-4 h-4 mr-2" :stroke-width="2.5" />
                         Mes commandes
@@ -476,7 +655,6 @@ const handleLogout = () => {
               </SheetContent>
             </Sheet>
 
-            <!-- Bouton panier -->
             <NuxtLink 
               to="/panier" 
               class="global-cart-button"
@@ -487,8 +665,6 @@ const handleLogout = () => {
                 {{ cartStore.totalItems }}
               </span>
             </NuxtLink>
-
-            <!-- Section authentification desktop -->
             <template v-if="!isAuthenticated">
               <Button 
                 variant="outline" 
@@ -511,7 +687,6 @@ const handleLogout = () => {
               </Button>
             </template>
 
-            <!-- Menu utilisateur quand connecté -->
             <template v-else>
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
@@ -521,15 +696,20 @@ const handleLogout = () => {
                     </div>
                     <div class="text-left hidden lg:block">
                       <div class="text-sm font-medium">Mon compte</div>
-                    </div>
+                      </div>
                     <ChevronDown class="w-4 h-4 hidden lg:block" :stroke-width="2.5" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" class="w-56">
-                  <DropdownMenuItem @click="navigateTo('/profil')">
-                    <UserIcon class="w-4 h-4 mr-2" :stroke-width="2.5" />
-                    Mon profil
+                  <DropdownMenuItem @click="navigateTo('/profil')" class="flex flex-col items-start h-auto py-2">
+                      <div class="flex items-center space-x-2 mb-1">
+                          <UserIcon class="w-4 h-4 text-primary" :stroke-width="2.5" />
+                          <span class="text-base font-semibold">Mon profil</span>
+                      </div>
+                      <span class="text-xs text-muted-foreground pl-6">{{ currentUser?.username || 'Utilisateur' }}</span>
+                      <span class="text-xs text-muted-foreground pl-6">{{ currentUser?.email || 'email@exemple.com' }}</span>
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem @click="navigateTo('/commandes')">
                     <Package class="w-4 h-4 mr-2" :stroke-width="2.5" />
                     Mes commandes
@@ -549,7 +729,6 @@ const handleLogout = () => {
           </div>
         </div>
 
-        <!-- Mobile search -->
         <div class="md:hidden pb-4">
           <form class="relative flex">
             <Input
@@ -568,7 +747,6 @@ const handleLogout = () => {
       </div>
     </nav>
 
-    <!-- Promotions bar -->
     <div class="bg-muted/30 border-b overflow-x-auto">
       <div class="container mx-auto px-4">
         <div class="flex items-center space-x-6 py-3 text-sm whitespace-nowrap">
@@ -586,7 +764,6 @@ const handleLogout = () => {
       </div>
     </div>
 
-    <!-- Dialogue d'authentification -->
     <Dialog v-model:open="authDialogOpen">
       <DialogContent class="sm:max-w-[425px]">
         <DialogHeader>
@@ -597,30 +774,56 @@ const handleLogout = () => {
               : 'Créez un compte pour bénéficier de nos services' }}
           </DialogDescription>
         </DialogHeader>
+        
         <div class="grid gap-4 py-4">
+          <div v-if="errorMessage" class="text-red-500 text-sm p-2 bg-red-50 rounded">
+            {{ errorMessage }}
+          </div>
+          
           <div class="grid grid-cols-4 items-center gap-4">
             <Label for="email" class="text-right">
               Email
             </Label>
-            <Input id="email" v-model="email" type="email" class="col-span-3" />
+            <Input 
+              id="email" 
+              v-model="email" 
+              type="email" 
+              class="col-span-3" 
+              placeholder="votre@email.com"
+            />
           </div>
+          
           <div class="grid grid-cols-4 items-center gap-4">
             <Label for="password" class="text-right">
               Mot de passe
             </Label>
-            <Input id="password" v-model="password" type="password" class="col-span-3" />
+            <Input 
+              id="password" 
+              v-model="password" 
+              type="password" 
+              class="col-span-3" 
+              placeholder="••••••••"
+            />
           </div>
+          
           <div v-if="authMode === 'register'" class="grid grid-cols-4 items-center gap-4">
             <Label for="confirm-password" class="text-right">
               Confirmer
             </Label>
-            <Input id="confirm-password" v-model="confirmPassword" type="password" class="col-span-3" />
+            <Input 
+              id="confirm-password" 
+              v-model="confirmPassword" 
+              type="password" 
+              class="col-span-3" 
+              placeholder="••••••••"
+            />
           </div>
         </div>
+        
         <DialogFooter>
           <Button 
             variant="outline" 
-            @click="authMode = authMode === 'login' ? 'register' : 'login'"
+            @click="authMode = authMode === 'login' ? 'register' : 'login'; resetForm()"
           >
             {{ authMode === 'login' ? 'Créer un compte' : 'Déjà un compte ?' }}
           </Button>
@@ -628,13 +831,15 @@ const handleLogout = () => {
             type="submit" 
             @click="authMode === 'login' ? handleLogin() : handleRegister()"
           >
-            {{ authMode === 'login' ? 'Se connecter' : 'S\'inscrire' }}
+            {{ authMode === 'login' ? 'Se connecter' : "S'inscrire" }}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   </div>
 </template>
+
+---
 
 <style scoped>
 .container {
@@ -675,70 +880,37 @@ const handleLogout = () => {
   color: #2c3e50;
 }
 
-/* Conteneur de l'icône du panier pour le positionnement */
-.cart-icon-container {
-  /* Pas de styles spécifiques ici, le style est sur le bouton lui-même */
-}
-
-/* Styles appliqués au composant Button (shadcn/ui) via la classe 'global-cart-button' */
+/* Styles pour le bouton du panier (global-cart-button) */
 .global-cart-button {
-  background-color: #3498db; /* Couleur de fond bleue pour le bouton panier */
-  color: white; /* Couleur du texte blanc */
-  padding: 0.75rem 1rem; /* Espacement interne */
-  border-radius: 9999px; /* Forme de pilule pour le bouton */
-  display: flex; /* Utilise flexbox pour aligner l'icône et le texte */
-  align-items: center; /* Centre verticalement les éléments */
-  gap: 0.5rem; /* Espace entre l'icône et le texte */
-  cursor: pointer; /* Indique que l'élément est cliquable */
-  border: none; /* Pas de bordure par défaut (shadcn/ui Button peut avoir sa propre bordure) */
-  font-weight: 600; /* Gras pour le texte */
-  transition: background-color 0.2s ease-in-out; /* Transition douce sur le survol */
-  position: relative; /* Nécessaire pour positionner le compteur d'articles */
+  position: relative; /* Pour positionner le compteur d'articles */
+  background-color: #3498db; /* Couleur bleue désirée */
+  color: white;
+  padding: 0.75rem 1rem;
+  border-radius: 9999px; /* Forme de pilule/cercle */
+  display: flex;
+  align-items: center;
+  justify-content: center; /* Centre l'icône dans le bouton */
+  transition: background-color 0.2s ease-in-out;
+  margin-left: 0.5rem; /* Ajout d'une petite marge pour le séparer des autres boutons */
 }
 
 .global-cart-button:hover {
-  background-color: #2980b9; /* Couleur de fond au survol */
+  background-color: #2a7ab9; /* Couleur plus foncée au survol */
 }
 
-.global-cart-button svg {
-  width: 1.5rem; /* Largeur de l'icône SVG */
-  height: 1.5rem; /* Hauteur de l'icône SVG */
-}
-
-/* Styles pour le compteur d'articles dans le panier */
+/* Style pour le compteur d'articles du panier */
 .cart-item-count {
-  position: absolute; /* Positionnement absolu par rapport au bouton parent */
-  top: -8px; /* Décalage vers le haut */
-  right: -8px; /* Décalage vers la droite */
-  background-color: #e74c3c; /* Couleur de fond rouge */
-  color: white; /* Couleur du texte blanc */
+  position: absolute;
+  top: -8px; /* Ajustez pour le positionnement */
+  right: -8px; /* Ajustez pour le positionnement */
+  background-color: #e74c3c; /* Couleur rouge pour le compteur */
+  color: white;
   font-size: 0.75rem; /* Taille de police plus petite */
-  font-weight: bold; /* Texte en gras */
+  font-weight: bold;
   border-radius: 50%; /* Forme circulaire */
-  padding: 0.25rem 0.5rem; /* Espacement interne */
-  line-height: 1; /* Assure un bon alignement vertical du texte */
-  min-width: 20px; /* Largeur minimale pour l'affichage */
-  text-align: center; /* Centre le texte */
-  display: flex; /* Utilise flexbox pour centrer le texte */
-  justify-content: center; /* Centre horizontalement le texte */
-  align-items: center; /* Centre verticalement le texte */
-}
-
-/* Custom scrollbar */
-.overflow-x-auto::-webkit-scrollbar {
-  height: 4px;
-}
-
-.overflow-x-auto::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
-}
-
-.overflow-x-auto::-webkit-scrollbar-thumb {
-  background: hsl(var(--primary));
-  border-radius: 2px;
-}
-
-.overflow-x-auto::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--primary) / 0.8);
+  padding: 2px 6px; /* Ajustez le padding pour la taille */
+  min-width: 20px; /* Taille minimale pour les chiffres à 1 ou 2 chiffres */
+  text-align: center;
+  line-height: 1.2;
 }
 </style>

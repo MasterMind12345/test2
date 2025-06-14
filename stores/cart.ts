@@ -1,84 +1,129 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 
-// Interface pour un produit dans le panier
-// Le 'name' est utilisé pour le store, correspondant au 'Nom' du produit Strapi
 interface CartProduct {
   id: number;
   name: string; 
-  price: number;
-  image?: string; // URL complète de l'image
-  quantity: number; // Nouvelle propriété pour la quantité
+  price: number; // S'assurer que ceci est bien un nombre
+  image?: string;
+  quantity: number; // S'assurer que ceci est bien un nombre
 }
 
 export const useCartStore = defineStore('cart', () => {
   const items = ref<CartProduct[]>([]);
-  const locationCost = ref<number>(0); // Nouveau: Coût de livraison
+  const locationCost = ref<number>(0);
 
-  // Getter: Nombre total d'articles dans le panier
-  const totalItems = computed(() => {
-    return items.value.reduce((sum, item) => sum + item.quantity, 0);
-  });
+  // --- Getters ---
+  const totalItems = computed(() =>
+    items.value.reduce((sum, item) => sum + item.quantity, 0)
+  );
 
-  // Getter: Prix total des articles dans le panier (hors livraison)
-  const totalPrice = computed(() => {
-    return items.value.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  });
+  const totalPrice = computed(() =>
+    // Les multiplications ici assument que price et quantity sont des nombres
+    items.value.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  );
 
-  // Nouveau Getter: Grand total (articles + livraison)
-  const grandTotal = computed(() => {
-    return totalPrice.value + locationCost.value;
-  });
+  const grandTotal = computed(() =>
+    // L'addition ici assume que totalPrice et locationCost sont des nombres
+    totalPrice.value + locationCost.value
+  );
 
-  // Action: Ajoute ou incrémente un article dans le panier
+  // --- Actions ---
   const addItem = (product: Omit<CartProduct, 'quantity'>) => {
     const existingItem = items.value.find(item => item.id === product.id);
     if (existingItem) {
-      existingItem.quantity++; // Incrémente la quantité si l'article existe
+      existingItem.quantity++;
     } else {
-      items.value.push({ ...product, quantity: 1 }); // Ajoute avec quantité 1 sinon
+      items.value.push({ ...product, quantity: 1 });
     }
   };
 
-  // Action: Diminue la quantité ou retire l'article si quantité = 1
   const removeItem = (productId: number) => {
-    const existingItemIndex = items.value.findIndex(item => item.id === productId);
-    if (existingItemIndex > -1) {
-      const existingItem = items.value[existingItemIndex];
-      if (existingItem.quantity > 1) {
-        existingItem.quantity--; // Diminue la quantité
+    const index = items.value.findIndex(item => item.id === productId);
+    if (index > -1) {
+      const item = items.value[index];
+      if (item.quantity > 1) {
+        item.quantity--;
       } else {
-        items.value.splice(existingItemIndex, 1); // Retire complètement l'article
+        items.value.splice(index, 1);
       }
     }
   };
 
-  // Action: Retire complètement un article du panier (indépendamment de la quantité)
   const clearItem = (productId: number) => {
     items.value = items.value.filter(item => item.id !== productId);
   };
 
-  // Action: Vide tout le panier
   const clearCart = () => {
     items.value = [];
-    locationCost.value = 0; // Réinitialise aussi le coût de livraison
+    locationCost.value = 0;
   };
 
-  // Nouvelle Action: Définit le coût de livraison
   const setLocationCost = (cost: number) => {
     locationCost.value = cost;
   };
 
-  return { 
-    items, 
-    locationCost, // Exposer le coût de livraison
-    totalItems, 
-    totalPrice, 
-    grandTotal, // Exposer le grand total
-    addItem, 
-    removeItem, 
-    clearItem, 
-    clearCart, 
-    setLocationCost // Exposer l'action pour définir le coût
+  const loadCart = () => {
+    if (typeof localStorage !== 'undefined') {
+      const savedItems = localStorage.getItem('cartItems');
+      const savedLocationCost = localStorage.getItem('cartLocationCost');
+
+      if (savedItems) {
+        try {
+          const parsed = JSON.parse(savedItems) as CartProduct[];
+          // Assure que price et quantity sont des nombres lors du chargement
+          items.value = parsed.map(p => ({
+            ...p,
+            price: Number(p.price),
+            quantity: Number(p.quantity)
+          }));
+        } catch (e) {
+          console.error("Erreur parsing panier", e);
+          items.value = [];
+        }
+      }
+
+      if (savedLocationCost) {
+        try {
+          // Assure que locationCost est un nombre lors du chargement
+          locationCost.value = parseFloat(savedLocationCost) || 0;
+        } catch (e) {
+          console.error("Erreur parsing coût livraison", e);
+          locationCost.value = 0;
+        }
+      }
+    }
+  };
+
+  // --- Watchers ---
+  watch(items, (newItems) => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('cartItems', JSON.stringify(newItems));
+    }
+  }, { deep: true });
+
+  watch(locationCost, (newCost) => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('cartLocationCost', JSON.stringify(newCost));
+    }
+  });
+
+  // --- Initialisation (optionnel) ---
+  if (typeof window !== 'undefined') {
+    loadCart();
+  }
+
+  return {
+    items,
+    locationCost,
+    totalItems,
+    totalPrice,
+    grandTotal,
+    addItem,
+    removeItem,
+    clearItem,
+    clearCart,
+    setLocationCost,
+    loadCart,
   };
 });

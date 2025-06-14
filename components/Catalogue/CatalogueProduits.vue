@@ -221,32 +221,30 @@ const fetchProducts = async () => {
     }
 
     // Mappage pour extraire les données de produits, en assumant une structure aplatie
-    return json.data.map((item: any) => {
-      // Accès direct aux champs du produit (Nom, prix, anscienPrix)
+return json.data.map((item: any) => {
       const productName = item.Nom || 'Sans nom';
-      const productPrice = item.prix ? Number(item.prix).toLocaleString() : 'N/A';
+      // Gardez productPrice comme un nombre ici. Formatez-le uniquement pour l'affichage dans le template.
+      const productPrice = Number(item.prix); // Assurez-vous que c'est un nombre ici
 
-      // Accès aux images: Si item.image est directement un tableau d'objets image avec 'url'
       const images = Array.isArray(item.image) ? item.image : [];
-      const imageUrls = images.map((img: any) => ({ url: img.url })); // Assumant que l'URL est directement sur l'objet image
+      const imageUrls = images.map((img: any) => ({ url: img.url }));
 
-      // Accès à la catégorie: Si item.category est directement l'objet catégorie
-      const category = item.category 
-        ? { id: item.category.id, Nom: item.category.Nom } // Accès direct aux propriétés de la catégorie
+      const category = item.category
+        ? { id: item.category.id, Nom: item.category.Nom }
         : null;
 
       return {
-        id: item.id, // L'ID est toujours au niveau racine
-        Nom: productName, 
-        prix: productPrice,
-        anscienPrix: item.anscienPrix, // Accès direct
+        id: item.id,
+        Nom: productName,
+        prix: productPrice, // Ceci devrait maintenant être un nombre
+        anscienPrix: item.anscienPrix,
         image: imageUrls,
         category: category
       };
     });
   } catch (err: any) {
     console.error('Erreur fetch produits:', err);
-    throw err; 
+    throw err;
   }
 };
 

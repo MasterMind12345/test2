@@ -60,7 +60,7 @@
           <span>Total à payer:</span>
           <span>{{ cartStore.grandTotal }} FCFA</span>
         </div>
-        <button @click="checkout" class="checkout-button">Procéder au paiement</button>
+        <button @click="verifyUserBeforeCheckout" class="checkout-button">Procéder au paiement</button>
         <button @click="cartStore.clearCart()" class="clear-cart-button">Vider le panier</button>
       </div>
     </div>
@@ -102,6 +102,116 @@
         </div>
       </div>
     </div>
+
+    <!-- Dialog pour l'authentification -->
+    <div v-if="showAuthDialog" class="auth-dialog-overlay" @click.self="closeAuthDialog">
+      <div class="auth-dialog-content">
+        <button @click="closeAuthDialog" class="auth-dialog-close">&times;</button>
+        <h2 class="auth-dialog-title">{{ authMode === 'login' ? 'Connexion' : 'Inscription' }}</h2>
+        
+        <div class="auth-tabs">
+          <button 
+            @click="authMode = 'login'" 
+            :class="{ 'active': authMode === 'login' }"
+            class="auth-tab"
+          >
+            Connexion
+          </button>
+          <button 
+            @click="authMode = 'register'" 
+            :class="{ 'active': authMode === 'register' }"
+            class="auth-tab"
+          >
+            Inscription
+          </button>
+        </div>
+
+        <form @submit.prevent="authMode === 'login' ? handleLogin() : handleRegister()" class="auth-form">
+          <div v-if="errorMessage" class="auth-error-message">
+            {{ errorMessage }}
+          </div>
+
+          <div class="form-group">
+            <label for="auth-email">Email</label>
+            <input
+              id="auth-email"
+              v-model="email"
+              type="email"
+              required
+              class="form-input"
+              placeholder="votre@email.com"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="auth-password">Mot de passe</label>
+            <input
+              id="auth-password"
+              v-model="password"
+              type="password"
+              required
+              class="form-input"
+              placeholder="••••••••"
+              minlength="6"
+            />
+          </div>
+
+          <div class="form-group" v-if="authMode === 'register'">
+            <label for="auth-confirm-password">Confirmer le mot de passe</label>
+            <input
+              id="auth-confirm-password"
+              v-model="confirmPassword"
+              type="password"
+              required
+              class="form-input"
+              placeholder="••••••••"
+              minlength="6"
+            />
+          </div>
+
+          <button type="submit" class="auth-submit-button" :disabled="isLoading">
+            <span v-if="!isLoading">
+              {{ authMode === 'login' ? 'Se connecter' : "S'inscrire" }}
+            </span>
+            <span v-else>Chargement...</span>
+          </button>
+        </form>
+
+        <div class="auth-switch">
+          <button 
+            @click="authMode = authMode === 'login' ? 'register' : 'login'; resetForm()"
+            class="auth-switch-button"
+          >
+            {{ authMode === 'login' ? 'Pas de compte ? Créer un compte' : 'Déjà un compte ? Se connecter' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dialog pour choisir le mode de paiement -->
+    <div v-if="showPaymentDialog" class="payment-dialog-overlay" @click.self="closePaymentDialog">
+      <div class="payment-dialog-content">
+        <button @click="closePaymentDialog" class="payment-dialog-close">&times;</button>
+        <h2 class="payment-dialog-title">Choisissez votre mode de paiement</h2>
+        
+        <div class="payment-options">
+          <button @click="processPayment('online')" class="payment-option">
+            <svg xmlns="http://www.w3.org/2000/svg" class="payment-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
+            <span>Paiement en ligne</span>
+          </button>
+          
+          <button @click="processPayment('delivery')" class="payment-option">
+            <svg xmlns="http://www.w3.org/2000/svg" class="payment-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+            </svg>
+            <span>Paiement à la livraison</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -112,14 +222,13 @@ import { navigateTo } from '#app';
 
 const cartStore = useCartStore();
 
-// État de la fenêtre modale
+// État de la fenêtre modale de localisation
 const showLocationModal = ref(false);
 const selectedCity = ref<string | null>(null);
 const selectedNeighborhood = ref<string | null>(null);
-const tempLocationCost = ref<number | null>(null); // Coût affiché dans la modale avant application
+const tempLocationCost = ref<number | null>(null);
 
 // Données fictives pour les villes et quartiers
-// En production, ces données viendraient d'une API
 const locationData = ref([
   {
     name: 'Douala',
@@ -147,18 +256,35 @@ const locationData = ref([
   },
 ]);
 
+// État pour l'authentification
+const showAuthDialog = ref(false);
+const authMode = ref<'login' | 'register'>('login');
+const email = ref('');
+const password = ref('');
+const confirmPassword = ref('');
+const errorMessage = ref('');
+const isLoading = ref(false);
+const isAuthenticated = ref(false);
+const currentUser = ref<any | null>(null);
+
+// État pour le choix du paiement
+const showPaymentDialog = ref(false);
+
+// URL de base de l'API Strapi
+const STRAPI_URL = 'https://kind-duck-a00ba31603.strapiapp.com/api';
+
 // Computed pour les villes disponibles
 const availableCities = computed(() => {
   return locationData.value.map(city => ({ name: city.name }));
 });
 
-// Computed pour les quartiers disponibles en fonction de la ville sélectionnée
+// Computed pour les quartiers disponibles
 const availableNeighborhoods = computed(() => {
   const city = locationData.value.find(c => c.name === selectedCity.value);
   return city ? city.neighborhoods : [];
 });
 
-// Watcher pour calculer le coût lorsque le quartier sélectionné change
+// Watcher pour calculer le coût de livraison
 watch(selectedNeighborhood, (newNeighborhood) => {
   if (newNeighborhood && selectedCity.value) {
     const city = locationData.value.find(c => c.name === selectedCity.value);
@@ -167,42 +293,176 @@ watch(selectedNeighborhood, (newNeighborhood) => {
   } else {
     tempLocationCost.value = null;
   }
-}, { immediate: true });
+});
 
-// Fonction pour ouvrir la modale
+// Fonction pour formater les prix
+const formatPrice = (price: number) => {
+  return new Intl.NumberFormat('fr-FR').format(price);
+};
+
+// Fonctions pour la modale de localisation
 const openLocationModal = () => {
   showLocationModal.value = true;
-  // Réinitialise les sélections et le coût temporaire à l'ouverture de la modale
   selectedCity.value = null;
   selectedNeighborhood.value = null;
   tempLocationCost.value = null;
 };
 
-// Fonction pour fermer la modale
 const closeLocationModal = () => {
   showLocationModal.value = false;
 };
 
-// Fonction pour appliquer le coût de livraison au store Pinia
 const applyLocation = () => {
   if (tempLocationCost.value !== null) {
     cartStore.setLocationCost(tempLocationCost.value);
     closeLocationModal();
-  } else {
-    alert('Veuillez sélectionner une ville et un quartier valides.');
   }
 };
 
-// Fonction de simulation pour le paiement
-const checkout = () => {
-  alert(`Procédure de paiement non implémentée.\nTotal à payer: ${cartStore.grandTotal} FCFA\nPanier vidé.`);
-  cartStore.clearCart();
-  navigateTo('/'); 
+// Fonctions d'authentification
+const handleLogin = async () => {
+  errorMessage.value = '';
+  isLoading.value = true;
+
+  try {
+    const response = await fetch(`${STRAPI_URL}/auth/local`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        identifier: email.value,
+        password: password.value,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+      errorMessage.value = data.error.message;
+      return;
+    }
+
+    localStorage.setItem('jwt', data.jwt);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    isAuthenticated.value = true;
+    currentUser.value = data.user;
+    
+    showAuthDialog.value = false;
+    showPaymentDialog.value = true;
+    resetForm();
+    
+  } catch (error) {
+    console.error('Erreur lors de la connexion:', error);
+    errorMessage.value = 'Erreur réseau ou serveur. Veuillez réessayer.';
+  } finally {
+    isLoading.value = false;
+  }
 };
 
-// Optionnel: Pour déboguer l'état du panier au chargement de la page
+const handleRegister = async () => {
+  errorMessage.value = '';
+  isLoading.value = true;
+
+  if (password.value !== confirmPassword.value) {
+    errorMessage.value = 'Les mots de passe ne correspondent pas.';
+    isLoading.value = false;
+    return;
+  }
+
+  try {
+    const response = await fetch(`${STRAPI_URL}/auth/local/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username: email.value.split('@')[0],
+        email: email.value,
+        password: password.value,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+      errorMessage.value = data.error.message;
+      return;
+    }
+
+    localStorage.setItem('jwt', data.jwt);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    isAuthenticated.value = true;
+    currentUser.value = data.user;
+    
+    showAuthDialog.value = false;
+    showPaymentDialog.value = true;
+    resetForm();
+    
+  } catch (error) {
+    console.error('Erreur lors de l\'inscription:', error);
+    errorMessage.value = 'Erreur réseau ou serveur. Veuillez réessayer.';
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+const resetForm = () => {
+  email.value = '';
+  password.value = '';
+  confirmPassword.value = '';
+  errorMessage.value = '';
+};
+
+const closeAuthDialog = () => {
+  showAuthDialog.value = false;
+  resetForm();
+};
+
+// Fonction pour vérifier l'utilisateur avant paiement
+const verifyUserBeforeCheckout = () => {
+  const jwt = localStorage.getItem('jwt');
+  if (jwt) {
+    showPaymentDialog.value = true;
+  } else {
+    showAuthDialog.value = true;
+    authMode.value = 'login';
+  }
+};
+
+// Fonctions pour gérer le choix de paiement
+const processPayment = (method: 'online' | 'delivery') => {
+  alert(`Paiement par ${method === 'online' ? 'en ligne' : 'à la livraison'} sélectionné. Total: ${formatPrice(cartStore.grandTotal)} FCFA`);
+  
+  if (method === 'online') {
+    setTimeout(() => {
+      alert('Paiement effectué avec succès!');
+      cartStore.clearCart();
+      navigateTo('/');
+    }, 1000);
+  } else {
+    alert('Commande confirmée. Vous paierez à la livraison.');
+    cartStore.clearCart();
+    navigateTo('/');
+  }
+  
+  showPaymentDialog.value = false;
+};
+
+const closePaymentDialog = () => {
+  showPaymentDialog.value = false;
+};
+
+// Vérifier l'authentification au chargement
 onMounted(() => {
-  console.log('Page Panier chargée. Contenu du panier:', cartStore.items.value);
+  const jwt = localStorage.getItem('jwt');
+  if (jwt) {
+    isAuthenticated.value = true;
+    const user = localStorage.getItem('user');
+    if (user) {
+      currentUser.value = JSON.parse(user);
+    }
+  }
 });
 </script>
 
@@ -243,17 +503,17 @@ onMounted(() => {
 .cart-content {
   display: flex;
   gap: 30px;
-  flex-wrap: wrap; /* Permet un retour à la ligne sur les petits écrans */
+  flex-wrap: wrap;
 }
 
 .cart-items-list {
   flex: 3;
-  min-width: 300px; /* Assure que la liste ne devient pas trop petite */
+  min-width: 300px;
 }
 
 .cart-item-card {
   display: flex;
-  align-items: flex-start; /* Alignement du haut pour les descriptions */
+  align-items: flex-start;
   background-color: #fff;
   border-radius: 10px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
@@ -269,7 +529,7 @@ onMounted(() => {
   border-radius: 8px;
   background-color: #eee;
   padding: 5px;
-  flex-shrink: 0; /* Empêche l'image de rétrécir */
+  flex-shrink: 0;
 }
 
 .cart-item-details {
@@ -352,13 +612,13 @@ onMounted(() => {
   border-radius: 10px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   height: fit-content;
-  min-width: 250px; /* Assure que le résumé ne devient pas trop petit */
+  min-width: 250px;
 }
 
 .summary-line {
   display: flex;
   justify-content: space-between;
-  align-items: center; /* Pour aligner le bouton de localisation */
+  align-items: center;
   margin-bottom: 10px;
   font-size: 1rem;
   color: #34495e;
@@ -423,7 +683,7 @@ onMounted(() => {
   background-color: #2980b9;
 }
 
-/* Styles pour la modale */
+/* Styles pour la modale de localisation */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -492,7 +752,7 @@ onMounted(() => {
   border-radius: 6px;
   font-size: 1rem;
   background-color: #f8f8f8;
-  appearance: none; /* Supprime le style par défaut du select */
+  appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'%3E%3C/path%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
@@ -557,17 +817,237 @@ onMounted(() => {
   border-color: #c0c0c0;
 }
 
+/* Styles pour la dialog d'authentification */
+.auth-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.auth-dialog-content {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  width: 90%;
+  max-width: 400px;
+  padding: 24px;
+  position: relative;
+}
+
+.auth-dialog-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+.auth-dialog-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+  text-align: center;
+  color: #111827;
+}
+
+.auth-tabs {
+  display: flex;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 20px;
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 8px 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.auth-tab.active {
+  color: #111827;
+  border-bottom-color: #3b82f6;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.form-input {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.auth-submit-button {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-top: 8px;
+}
+
+.auth-submit-button:hover {
+  background-color: #2563eb;
+}
+
+.auth-submit-button:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.auth-error-message {
+  color: #ef4444;
+  font-size: 0.875rem;
+  text-align: center;
+  margin-top: 8px;
+  padding: 8px;
+  background-color: #fee2e2;
+  border-radius: 6px;
+}
+
+.auth-switch {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.auth-switch-button {
+  background: none;
+  border: none;
+  color: #3b82f6;
+  font-size: 0.875rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.auth-switch-button:hover {
+  color: #2563eb;
+}
+
+/* Styles pour la dialog de choix de paiement */
+.payment-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.payment-dialog-content {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  width: 90%;
+  max-width: 400px;
+  padding: 24px;
+  position: relative;
+}
+
+.payment-dialog-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+.payment-dialog-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+  text-align: center;
+  color: #111827;
+}
+
+.payment-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.payment-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background-color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.payment-option:hover {
+  border-color: #3b82f6;
+  background-color: #f9fafb;
+}
+
+.payment-icon {
+  width: 24px;
+  height: 24px;
+  color: #3b82f6;
+}
+
 @media (max-width: 768px) {
   .cart-content {
     flex-direction: column;
   }
+  
   .cart-items-list, .cart-summary {
     width: 100%;
     min-width: unset;
   }
+  
   .modal-content {
     padding: 20px;
   }
+  
   .modal-title {
     font-size: 1.5rem;
   }
