@@ -729,12 +729,17 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="md:hidden pb-4">
-          <form class="relative flex">
+        <!-- Version mobile de la recherche - MODIFIÉE -->
+        <div class="md:hidden pb-4 relative">
+          <form @submit.prevent="performSearch" class="relative flex">
             <Input
+              v-model="searchQuery"
               type="text"
               placeholder="Que recherchez-vous ?"
               class="flex-1 rounded-r-none border-r-0 focus-visible:ring-primary"
+              @focus="showResults = true"
+              @blur="closeResults"
+              @input="performSearch"
             />
             <Button
               type="submit"
@@ -743,6 +748,44 @@ onMounted(() => {
               <Search class="w-5 h-5" :stroke-width="2.5" />
             </Button>
           </form>
+
+          <!-- Résultats de recherche mobile - AJOUTÉ -->
+          <div 
+            v-if="showResults && (searchResults.length > 0 || isLoading)"
+            class="absolute left-0 right-0 z-50 mt-1 bg-background border rounded-lg shadow-lg max-h-96 overflow-y-auto"
+            style="width: calc(100% - 2rem); margin-left: 1rem;"
+          >
+            <div v-if="isLoading" class="p-4 text-center text-muted-foreground">
+              Chargement...
+            </div>
+            <div v-else-if="searchResults.length === 0" class="p-4 text-center text-muted-foreground">
+              Aucun résultat trouvé
+            </div>
+            <div v-else>
+              <div 
+                v-for="product in searchResults"
+                :key="product.id"
+                class="p-3 hover:bg-muted/50 cursor-pointer flex items-center gap-3 border-b"
+                @click="navigateToProduct(product)"
+              >
+                <div class="w-12 h-12 bg-muted rounded-md flex-shrink-0 overflow-hidden">
+                  <img 
+                    v-if="product.image?.[0]?.url"
+                    :src="getStrapiImageUrl(product.image[0].url)"
+                    class="w-full h-full object-cover"
+                  />
+                  <div v-else class="w-full h-full flex items-center justify-center bg-muted">
+                    <Package class="w-5 h-5 text-muted-foreground" />
+                  </div>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <h4 class="font-medium truncate">{{ product.Nom }}</h4>
+                  <p class="text-sm text-muted-foreground">{{ product.prix }}</p>
+                  <p class="text-xs text-muted-foreground">{{ product.categorie }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </nav>
@@ -838,8 +881,6 @@ onMounted(() => {
     </Dialog>
   </div>
 </template>
-
----
 
 <style scoped>
 .container {
