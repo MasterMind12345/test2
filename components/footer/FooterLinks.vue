@@ -4,25 +4,25 @@
     <div>
       <h3 class="font-semibold mb-4">Boutique</h3>
       <ul class="space-y-2">
-        <li><a href="#" class="hover:text-orange-600">Nouveautés</a></li>
-        <li><a href="#" class="hover:text-orange-600">Promotions</a></li>
-        <li><a href="#" class="hover:text-orange-600">compte</a></li>
+        <li><NuxtLink to="/" class="hover:text-orange-600">Nouveautés</NuxtLink></li>
+        <li><NuxtLink to="" class="hover:text-orange-600">Promotions</NuxtLink></li>
+        <li><NuxtLink to="" class="hover:text-orange-600">compte</NuxtLink></li>
       </ul>                           
     </div>
     <div>
       <h3 class="font-semibold mb-4">À propos</h3>
       <ul class="space-y-2">
-        <li><a href="#" class="hover:text-orange-600">comment acheter chez nous</a></li>
-        <li><a href="tel:+237659597891"  class="hover:text-orange-600 flex "><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-phone-icon lucide-phone"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"/></svg>Nous contact</a></li>
-        <li><a href="#" class="hover:text-orange-600">qui somme nous?</a></li>
+        <li><NuxtLink href="/comment" class="hover:text-orange-600  transition">comment acheter chez nous</NuxtLink></li>
+        <li><NuxtLink to="tel:+237659597891"  class="hover:text-orange-600 flex gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-phone-icon lucide-phone"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"/></svg>Nous contact</NuxtLink></li>
+        <li><NuxtLink to="/qui-somme-nous" class="hover:text-orange-600">qui somme nous?</NuxtLink></li>
       </ul>
     </div>
     <div>
       <h3 class="font-semibold mb-4">Suivez-nous</h3>
       <ul class="space-y-2">
-        <li><a href="#" class="hover:text-orange-600"><i class="fa-brands fa-facebook-f text-blue-500 text-2xl"></i></a></li>
-        <li><a href="#" class="hover:text-orange-600"><i class="fa-brands fa-instagram text-[#E1306C] hover:text-[#C13584] text-2xl"></i></a></li>
-        <li><a href="#" class="hover:text-orange-600"><i class="fa-brands fa-linkedin-in text-[#0A66C2] hover:text-[#084298] text-2xl"></i></a></li>
+        <li><NuxtLink to="" class="hover:text-orange-600"><i class="fa-brands fa-facebook-f text-blue-500 text-2xl"></i></NuxtLink></li>
+        <li><NuxtLink to="" class="hover:text-orange-600"><i class="fa-brands fa-instagram text-[#E1306C] hover:text-[#C13584] text-2xl"></i></NuxtLink></li>
+        <li><NuxtLink to="" class="hover:text-orange-600"><i class="fa-brands fa-linkedin-in text-[#0A66C2] hover:text-[#084298] text-2xl"></i></NuxtLink></li>
       </ul>
     </div>
     <div>

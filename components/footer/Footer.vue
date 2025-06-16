@@ -1,5 +1,5 @@
 <template>
-  <footer class="bg-red-900 text-white ">
+  <footer class="bg-gray-700 text-white ">
     <FooterTop />
     <FooterLinks />
     <FooterBottom />

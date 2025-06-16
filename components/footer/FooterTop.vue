@@ -1,7 +1,7 @@
 <template>
   <div class="py-8 px-4 sm:px-6 lg:px-16 flex flex-col md:flex-row justify-between items-center gap-4 border-b">
     <div class="text-center md:text-left">
-      <h2 class="text-xl font-semibold text-gray-50">Inscrivez-vous à notre newsletter</h2>
+      <h2 class="text-xl font-semibold text-gray-50 ">Inscrivez-vous à notre newsletter</h2>
       <p class="text-sm text-gray-50">Recevez les offres et actualités en avant-première.</p>
     </div>
     <form @submit.prevent class="flex flex-col sm:flex-row gap-2 w-full max-w-md">
