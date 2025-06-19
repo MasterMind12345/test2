@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { navigateTo as nuxtNavigateTo } from '#app';
 import { useProductsStore } from '@/stores/products';
 import { useCartStore } from '@/stores/cart';
 
 // Icônes Lucide Vue
 import { 
   Flame, Zap, Star, Percent, Clock, Monitor, ChefHat, Wind, Grid3X3, 
-  ShoppingCart, Search, Folder, FileText, UserIcon, Package, Heart, 
+  ShoppingCart, Search, Folder, FileText, User, Package, Heart, 
   LogOut, Menu, BadgePercent, ShoppingBag, LogIn, UserPlus, ChevronRight, ChevronDown 
 } from 'lucide-vue-next';
 
@@ -55,7 +54,7 @@ const currentUser = ref<any | null>(null);
 
 const STRAPI_URL = 'https://kind-duck-a00ba31603.strapiapp.com/api';
 
-// Fonctions d'authentification (conservées telles quelles)
+// Fonctions d'authentification
 const handleLogin = async () => {
   errorMessage.value = '';
   try {
@@ -165,10 +164,10 @@ const performSearch = async () => {
     
     searchResults.value = data.data.map((item: any) => ({
       id: item.id,
-      Nom: item.Nom || 'Sans nom',
-      prix: item.prix ? Number(item.prix).toLocaleString() + ' FCFA' : 'N/A',
-      image: item.image || [],
-      categorie: item.categorie?.Nom || 'Non catégorisé'
+      Nom: item.attributes?.Nom || item.Nom,
+      prix: item.attributes?.prix ? Number(item.attributes.prix).toLocaleString() + ' FCFA' : 'N/A',
+      image: item.attributes?.image?.data || item.image,
+      categorie: item.attributes?.category?.data?.attributes?.Nom || item.category?.Nom || 'Non catégorisé'
     }));
     
   } catch (error) {
@@ -288,8 +287,9 @@ onMounted(() => {
                 >
                   <div class="w-12 h-12 bg-muted rounded-md flex-shrink-0 overflow-hidden">
                     <img 
-                      v-if="product.image?.[0]?.url"
-                      :src="product.image[0].url.startsWith('http') ? product.image[0].url : `https://kind-duck-a00ba31603.strapiapp.com${product.image[0].url}`"
+                      v-if="product.image?.attributes?.url || product.image?.[0]?.url"
+                      :src="product.image?.attributes?.url || 
+                            (product.image[0].url.startsWith('http') ? product.image[0].url : `https://kind-duck-a00ba31603.strapiapp.com${product.image[0].url}`)"
                       class="w-full h-full object-cover"
                     />
                     <div v-else class="w-full h-full flex items-center justify-center bg-muted">
@@ -332,7 +332,11 @@ onMounted(() => {
                   
                   <div class="flex-1 overflow-y-auto p-4">
                     <div class="space-y-2">
-                      <div v-for="category in productsStore.categories" :key="category.id" class="border rounded-lg">
+                      <div 
+                        v-for="category in productsStore.categories.filter(c => c.isMainCategory)" 
+                        :key="category.id" 
+                        class="border rounded-lg"
+                      >
                         <Collapsible v-model:open="category.isOpen">
                           <CollapsibleTrigger as-child>
                             <Button
@@ -346,7 +350,9 @@ onMounted(() => {
                                 </div>
                                 <div class="text-left">
                                   <div class="font-medium">{{ category.Nom }}</div>
-                                  <div class="text-sm text-muted-foreground">{{ category.subcategories.length }} sous-catégories</div>
+                                  <div class="text-sm text-muted-foreground">
+                                    {{ productsStore.categories.filter(c => c.parentCategory === category.id).length }} sous-catégories
+                                  </div>
                                 </div>
                               </div>
                               <ChevronRight 
@@ -358,17 +364,17 @@ onMounted(() => {
                           </CollapsibleTrigger>
                           <CollapsibleContent class="border-t bg-muted/20">
                             <div class="p-2 space-y-1">
-<Button
-  v-for="subcategory in category.subcategories"
-  :key="subcategory.id"
-  variant="ghost"
-  size="sm"
-  class="w-full justify-start pl-6 hover:bg-background"
-  @click="productsStore.selectSubcategory(subcategory.id)"
->
-  <Folder class="w-4 h-4 mr-2 text-muted-foreground" :stroke-width="2.5" />
-  {{ subcategory.Nom }}
-</Button>
+                              <Button
+                                v-for="subcategory in productsStore.categories.filter(c => c.parentCategory === category.id)"
+                                :key="subcategory.id"
+                                variant="ghost"
+                                size="sm"
+                                class="w-full justify-start pl-6 hover:bg-background"
+                                @click="productsStore.selectCategory(subcategory.id)"
+                              >
+                                <Folder class="w-4 h-4 mr-2 text-muted-foreground" :stroke-width="2.5" />
+                                {{ subcategory.Nom }}
+                              </Button>
                             </div>
                           </CollapsibleContent>
                         </Collapsible>
@@ -419,7 +425,7 @@ onMounted(() => {
                       <Button variant="ghost" class="w-full justify-start h-auto py-2" @click="router.push('/profil')">
                         <div class="flex items-center space-x-3">
                           <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                            <UserIcon class="w-4 h-4 text-primary" :stroke-width="2.5" />
+                            <User class="w-4 h-4 text-primary" :stroke-width="2.5" />
                           </div>
                           <div class="flex flex-col items-start">
                             <span class="font-medium">Mon profil</span>
@@ -437,7 +443,10 @@ onMounted(() => {
                         Catégories
                       </h3>
                       <div class="space-y-1">
-                        <div v-for="category in productsStore.categories" :key="category.id">
+                        <div 
+                          v-for="category in productsStore.categories.filter(c => c.isMainCategory)" 
+                          :key="category.id"
+                        >
                           <Collapsible v-model:open="category.isOpenMobile">
                             <CollapsibleTrigger as-child>
                               <Button
@@ -457,17 +466,17 @@ onMounted(() => {
                               </Button>
                             </CollapsibleTrigger>
                             <CollapsibleContent class="ml-4 mt-1 space-y-1">
-<Button
-  v-for="subcategory in category.subcategories"
-  :key="subcategory.id"
-  variant="ghost"
-  size="sm"
-  class="w-full justify-start pl-6 hover:bg-background"
-  @click="productsStore.selectSubcategory(subcategory.id)"
->
-  <Folder class="w-4 h-4 mr-2 text-muted-foreground" :stroke-width="2.5" />
-  {{ subcategory.Nom }}
-</Button>
+                              <Button
+                                v-for="subcategory in productsStore.categories.filter(c => c.parentCategory === category.id)"
+                                :key="subcategory.id"
+                                variant="ghost"
+                                size="sm"
+                                class="w-full justify-start pl-6 hover:bg-background"
+                                @click="productsStore.selectSubcategory(subcategory.id)"
+                              >
+                                <Folder class="w-4 h-4 mr-2 text-muted-foreground" :stroke-width="2.5" />
+                                {{ subcategory.Nom }}
+                              </Button>
                             </CollapsibleContent>
                           </Collapsible>
                         </div>
@@ -535,7 +544,7 @@ onMounted(() => {
                 <DropdownMenuTrigger as-child>
                   <Button variant="outline" size="sm" class="hidden sm:flex items-center space-x-2">
                     <div class="w-8 h-8 flex items-center justify-center">
-                      <UserIcon class="w-4 h-4 text-primary" :stroke-width="2.5" />
+                      <User class="w-4 h-4 text-primary" :stroke-width="2.5" />
                     </div>
                     <div class="text-left hidden lg:block">
                       <div class="text-sm font-medium">Mon compte</div>
@@ -546,7 +555,7 @@ onMounted(() => {
                 <DropdownMenuContent align="end" class="w-56">
                   <DropdownMenuItem @click="router.push('/profil')" class="flex flex-col items-start h-auto py-2">
                     <div class="flex items-center space-x-2 mb-1">
-                      <UserIcon class="w-4 h-4 text-primary" :stroke-width="2.5" />
+                      <User class="w-4 h-4 text-primary" :stroke-width="2.5" />
                       <span class="text-base font-semibold">Mon profil</span>
                     </div>
                     <span class="text-xs text-muted-foreground pl-6">{{ currentUser?.username || 'Utilisateur' }}</span>
@@ -613,8 +622,9 @@ onMounted(() => {
               >
                 <div class="w-12 h-12 bg-muted rounded-md flex-shrink-0 overflow-hidden">
                   <img 
-                    v-if="product.image?.[0]?.url"
-                    :src="product.image[0].url.startsWith('http') ? product.image[0].url : `https://kind-duck-a00ba31603.strapiapp.com${product.image[0].url}`"
+                    v-if="product.image?.attributes?.url || product.image?.[0]?.url"
+                    :src="product.image?.attributes?.url || 
+                          (product.image[0].url.startsWith('http') ? product.image[0].url : `https://kind-duck-a00ba31603.strapiapp.com${product.image[0].url}`)"
                     class="w-full h-full object-cover"
                   />
                   <div v-else class="w-full h-full flex items-center justify-center bg-muted">

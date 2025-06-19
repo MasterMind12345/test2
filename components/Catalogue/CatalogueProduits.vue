@@ -135,12 +135,6 @@ const formatPrice = (price: number): string => {
 }
 
 const currentFilterTitle = computed(() => {
-  if (productsStore.selectedSubcategory) {
-    const subcategory = productsStore.subcategories.find(
-      s => s.id === productsStore.selectedSubcategory
-    );
-    return subcategory?.Nom || 'Produits';
-  }
   if (productsStore.selectedCategory) {
     const category = productsStore.categories.find(
       c => c.id === productsStore.selectedCategory
@@ -149,7 +143,6 @@ const currentFilterTitle = computed(() => {
   }
   return 'Tous les produits';
 });
-
 const handleAddToCart = (product: any): void => {
   cartStore.addItem({
     id: product.id,
